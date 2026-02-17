@@ -1,0 +1,560 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Otto Builder — Dual-Agent Architecture Analysis</title>
+<style>
+  :root {
+    --bg: #0a0a0f;
+    --surface: #12121a;
+    --surface2: #1a1a25;
+    --border: #2a2a3a;
+    --accent: #f59e0b;
+    --accent2: #8b5cf6;
+    --green: #10b981;
+    --red: #ef4444;
+    --text: #e4e4e7;
+    --muted: #71717a;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { 
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif; 
+    background: var(--bg); color: var(--text); line-height: 1.7;
+  }
+  .container { max-width: 900px; margin: 0 auto; padding: 0 24px; }
+  
+  /* Hero */
+  .hero {
+    padding: 80px 0 60px;
+    text-align: center;
+    background: linear-gradient(180deg, #12121a 0%, #0a0a0f 100%);
+    border-bottom: 1px solid var(--border);
+  }
+  .hero-badge {
+    display: inline-block;
+    padding: 6px 16px;
+    background: rgba(245, 158, 11, 0.1);
+    border: 1px solid rgba(245, 158, 11, 0.3);
+    border-radius: 20px;
+    font-size: 13px;
+    color: var(--accent);
+    margin-bottom: 24px;
+    letter-spacing: 0.5px;
+  }
+  .hero h1 {
+    font-size: 42px;
+    font-weight: 700;
+    letter-spacing: -1px;
+    margin-bottom: 16px;
+    background: linear-gradient(135deg, #fff 0%, #a1a1aa 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+  .hero p { font-size: 18px; color: var(--muted); max-width: 600px; margin: 0 auto; }
+  
+  /* Sections */
+  section { padding: 60px 0; border-bottom: 1px solid var(--border); }
+  h2 { font-size: 28px; font-weight: 600; margin-bottom: 24px; letter-spacing: -0.5px; }
+  h3 { font-size: 20px; font-weight: 600; margin-bottom: 12px; color: var(--accent); }
+  p { margin-bottom: 16px; color: var(--muted); }
+  
+  /* Architecture Diagram */
+  .arch-grid {
+    display: grid;
+    grid-template-columns: 1fr 80px 1fr;
+    gap: 16px;
+    align-items: center;
+    margin: 32px 0;
+  }
+  .agent-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 24px;
+    text-align: center;
+  }
+  .agent-card.otto { border-color: var(--accent); }
+  .agent-card.builder { border-color: var(--accent2); }
+  .agent-emoji { font-size: 48px; margin-bottom: 12px; }
+  .agent-name { font-size: 20px; font-weight: 600; color: #fff; }
+  .agent-role { font-size: 14px; color: var(--muted); margin-top: 4px; }
+  .agent-tools { margin-top: 16px; display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; }
+  .tool-chip {
+    padding: 3px 10px;
+    background: rgba(255,255,255,0.05);
+    border-radius: 12px;
+    font-size: 11px;
+    color: var(--muted);
+  }
+  .arrow-col { text-align: center; color: var(--accent); font-size: 24px; }
+  
+  /* Benefits */
+  .benefits-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+    margin: 24px 0;
+  }
+  .benefit {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 20px;
+  }
+  .benefit-icon { font-size: 28px; margin-bottom: 8px; }
+  .benefit h4 { font-size: 16px; font-weight: 600; color: #fff; margin-bottom: 6px; }
+  .benefit p { font-size: 14px; margin: 0; }
+  
+  /* Benchmark Table */
+  .bench-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 24px 0;
+    font-size: 14px;
+  }
+  .bench-table th {
+    text-align: left;
+    padding: 12px 16px;
+    background: var(--surface);
+    border-bottom: 2px solid var(--border);
+    color: var(--muted);
+    font-weight: 500;
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+  .bench-table td {
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--border);
+    color: var(--text);
+  }
+  .bench-table tr:hover td { background: rgba(255,255,255,0.02); }
+  .score-high { color: var(--green); font-weight: 600; }
+  .score-mid { color: var(--accent); font-weight: 600; }
+  .score-low { color: var(--red); font-weight: 600; }
+  .winner { background: rgba(16, 185, 129, 0.08) !important; }
+  
+  /* Bar Chart */
+  .bar-group { margin: 24px 0; }
+  .bar-row { display: flex; align-items: center; margin-bottom: 12px; gap: 12px; }
+  .bar-label { width: 120px; font-size: 13px; color: var(--muted); text-align: right; flex-shrink: 0; }
+  .bar-track { flex: 1; height: 28px; background: var(--surface); border-radius: 6px; overflow: hidden; position: relative; }
+  .bar-fill { height: 100%; border-radius: 6px; display: flex; align-items: center; padding-left: 10px; font-size: 12px; font-weight: 600; color: #fff; transition: width 1s ease; }
+  .bar-fill.auto { background: linear-gradient(90deg, #3b82f6, #60a5fa); }
+  .bar-fill.pro { background: linear-gradient(90deg, #8b5cf6, #a78bfa); }
+  .bar-fill.qwen { background: linear-gradient(90deg, #f59e0b, #fbbf24); }
+  
+  /* Findings Cards */
+  .finding-cards { display: grid; gap: 16px; margin: 24px 0; }
+  .finding {
+    background: var(--surface);
+    border-left: 3px solid var(--accent2);
+    border-radius: 0 12px 12px 0;
+    padding: 20px;
+  }
+  .finding.critical { border-left-color: var(--red); }
+  .finding.success { border-left-color: var(--green); }
+  .finding h4 { font-size: 15px; color: #fff; margin-bottom: 6px; }
+  .finding p { font-size: 13px; margin: 0; }
+  .finding .source { font-size: 11px; color: var(--accent); margin-top: 8px; }
+  
+  /* Status Banner */
+  .status-banner {
+    background: linear-gradient(135deg, rgba(245, 158, 11, 0.1), rgba(139, 92, 246, 0.1));
+    border: 1px solid rgba(245, 158, 11, 0.2);
+    border-radius: 12px;
+    padding: 24px;
+    margin: 32px 0;
+    text-align: center;
+  }
+  .status-banner h3 { color: var(--accent); margin-bottom: 8px; }
+  .status-banner p { margin: 0; font-size: 15px; }
+  
+  /* Pipeline */
+  .pipeline {
+    display: flex;
+    gap: 8px;
+    margin: 24px 0;
+    overflow-x: auto;
+  }
+  .pipe-step {
+    flex: 1;
+    min-width: 140px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 16px;
+    text-align: center;
+    position: relative;
+  }
+  .pipe-step::after {
+    content: '→';
+    position: absolute;
+    right: -14px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: var(--accent);
+    font-size: 18px;
+  }
+  .pipe-step:last-child::after { display: none; }
+  .pipe-num { font-size: 24px; font-weight: 700; color: var(--accent); }
+  .pipe-label { font-size: 13px; color: var(--muted); margin-top: 4px; }
+  .pipe-model { font-size: 11px; color: var(--accent2); margin-top: 4px; font-weight: 600; }
+  
+  /* Footer */
+  footer {
+    padding: 40px 0;
+    text-align: center;
+    color: var(--muted);
+    font-size: 13px;
+  }
+  footer a { color: var(--accent); text-decoration: none; }
+  
+  @media (max-width: 640px) {
+    .hero h1 { font-size: 28px; }
+    .benefits-grid { grid-template-columns: 1fr; }
+    .arch-grid { grid-template-columns: 1fr; }
+    .arrow-col { transform: rotate(90deg); }
+    .pipeline { flex-direction: column; }
+    .pipe-step::after { display: none; }
+  }
+</style>
+</head>
+<body>
+
+<div class="hero">
+  <div class="container">
+    <div class="hero-badge">🔬 Research & Architecture Analysis</div>
+    <h1>Otto Builder<br>Dual-Agent Architecture</h1>
+    <p>A data-driven analysis of separating AI agent responsibilities for cleaner development workflows, with multi-model review benchmarks.</p>
+  </div>
+</div>
+
+<section>
+  <div class="container">
+    <h2>The Architecture</h2>
+    <p>Instead of one overloaded agent handling conversations AND building software, we split responsibilities across two specialized agents running on the same gateway.</p>
+    
+    <div class="arch-grid">
+      <div class="agent-card otto">
+        <div class="agent-emoji">🦦</div>
+        <div class="agent-name">Otto</div>
+        <div class="agent-role">Conversationalist & Orchestrator</div>
+        <div class="agent-tools">
+          <span class="tool-chip">Planning</span>
+          <span class="tool-chip">Research</span>
+          <span class="tool-chip">Browser</span>
+          <span class="tool-chip">Memory</span>
+          <span class="tool-chip">Cron</span>
+          <span class="tool-chip">Dispatch</span>
+        </div>
+      </div>
+      <div class="arrow-col">⇄</div>
+      <div class="agent-card builder">
+        <div class="agent-emoji">🔨</div>
+        <div class="agent-name">Builder</div>
+        <div class="agent-role">Focused Implementation Agent</div>
+        <div class="agent-tools">
+          <span class="tool-chip">Code</span>
+          <span class="tool-chip">Exec</span>
+          <span class="tool-chip">Test</span>
+          <span class="tool-chip">Files</span>
+          <span class="tool-chip">Git</span>
+          <span class="tool-chip">Report</span>
+        </div>
+      </div>
+    </div>
+    
+    <p>Communication happens through <strong style="color:#fff">session messaging</strong> (private IPC) and <strong style="color:#fff">file-based handoff</strong> (PHASE.md). Each build phase runs in a fresh context window — no pollution from previous phases.</p>
+  </div>
+</section>
+
+<section>
+  <div class="container">
+    <h2>Why Two Agents?</h2>
+    <div class="benefits-grid">
+      <div class="benefit">
+        <div class="benefit-icon">🧠</div>
+        <h4>Clean Context Windows</h4>
+        <p>Each build phase starts fresh. No hallucinated references to deleted code. No compaction artifacts from chat history.</p>
+      </div>
+      <div class="benefit">
+        <div class="benefit-icon">🔒</div>
+        <h4>Restricted Tool Access</h4>
+        <p>Builder can't modify gateway config, manage cron jobs, or browse the web with a real browser. Principle of least privilege.</p>
+      </div>
+      <div class="benefit">
+        <div class="benefit-icon">📱</div>
+        <h4>Separate Communication</h4>
+        <p>Builder has its own Telegram bot for progress updates and blockers. No cross-contamination with Otto's conversations.</p>
+      </div>
+      <div class="benefit">
+        <div class="benefit-icon">⚡</div>
+        <h4>Parallel Workflows</h4>
+        <p>Otto continues handling conversations, research, and planning while Builder implements. No more "wait while I code."</p>
+      </div>
+      <div class="benefit">
+        <div class="benefit-icon">📋</div>
+        <h4>Specification-Driven</h4>
+        <p>Builder works from PRD + Architecture docs, not vibes. 99% accuracy per decision × 200 decisions = 13% chance of zero errors without a spec.</p>
+      </div>
+      <div class="benefit">
+        <div class="benefit-icon">🔄</div>
+        <h4>Phase-Based Recovery</h4>
+        <p>If Phase 3 fails, restart from Phase 3 — not from scratch. File-based handoff preserves all decisions and state.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section>
+  <div class="container">
+    <h2>The Review Pipeline</h2>
+    <p>Before deploying this architecture, we ran the plan through a <strong style="color:#fff">triple-model review process</strong> to stress-test security, architecture, and context management.</p>
+    
+    <div class="pipeline">
+      <div class="pipe-step">
+        <div class="pipe-num">1</div>
+        <div class="pipe-label">Auto Review</div>
+        <div class="pipe-model">ChatGPT Auto</div>
+      </div>
+      <div class="pipe-step">
+        <div class="pipe-num">2</div>
+        <div class="pipe-label">Critical Review</div>
+        <div class="pipe-model">Qwen3.5-Plus</div>
+      </div>
+      <div class="pipe-step">
+        <div class="pipe-num">3</div>
+        <div class="pipe-label">Fix & Iterate</div>
+        <div class="pipe-model">Score 9+</div>
+      </div>
+      <div class="pipe-step">
+        <div class="pipe-num">4</div>
+        <div class="pipe-label">Final Sign-off</div>
+        <div class="pipe-model">ChatGPT Pro</div>
+      </div>
+      <div class="pipe-step">
+        <div class="pipe-num">5</div>
+        <div class="pipe-label">Deploy</div>
+        <div class="pipe-model">Production</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section>
+  <div class="container">
+    <h2>LLM Benchmark Results</h2>
+    <p>We submitted the identical Builder Agent plan to three models and compared their analysis depth, scoring accuracy, and unique findings.</p>
+    
+    <h3>Security Scoring</h3>
+    <div class="bar-group">
+      <div class="bar-row">
+        <div class="bar-label">ChatGPT Auto</div>
+        <div class="bar-track"><div class="bar-fill auto" style="width:65%">6.5 / 10</div></div>
+      </div>
+      <div class="bar-row">
+        <div class="bar-label">ChatGPT Pro</div>
+        <div class="bar-track"><div class="bar-fill pro" style="width:45%">4.5 / 10</div></div>
+      </div>
+      <div class="bar-row">
+        <div class="bar-label">Qwen3.5-Plus</div>
+        <div class="bar-track"><div class="bar-fill qwen" style="width:45%">4.5 / 10</div></div>
+      </div>
+    </div>
+    
+    <h3>Architecture Scoring</h3>
+    <div class="bar-group">
+      <div class="bar-row">
+        <div class="bar-label">ChatGPT Auto</div>
+        <div class="bar-track"><div class="bar-fill auto" style="width:75%">7.5 / 10</div></div>
+      </div>
+      <div class="bar-row">
+        <div class="bar-label">ChatGPT Pro</div>
+        <div class="bar-track"><div class="bar-fill pro" style="width:75%">7.5 / 10</div></div>
+      </div>
+      <div class="bar-row">
+        <div class="bar-label">Qwen3.5-Plus</div>
+        <div class="bar-track"><div class="bar-fill qwen" style="width:60%">6.0 / 10</div></div>
+      </div>
+    </div>
+    
+    <h3>Context Management Scoring</h3>
+    <div class="bar-group">
+      <div class="bar-row">
+        <div class="bar-label">ChatGPT Auto</div>
+        <div class="bar-track"><div class="bar-fill auto" style="width:90%">9.0 / 10</div></div>
+      </div>
+      <div class="bar-row">
+        <div class="bar-label">ChatGPT Pro</div>
+        <div class="bar-track"><div class="bar-fill pro" style="width:80%">8.0 / 10</div></div>
+      </div>
+      <div class="bar-row">
+        <div class="bar-label">Qwen3.5-Plus</div>
+        <div class="bar-track"><div class="bar-fill qwen" style="width:70%">7.0 / 10</div></div>
+      </div>
+    </div>
+    
+    <h3>Full Comparison</h3>
+    <table class="bench-table">
+      <thead>
+        <tr>
+          <th>Dimension</th>
+          <th>ChatGPT Auto</th>
+          <th>ChatGPT Pro</th>
+          <th>Qwen3.5-Plus</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>Security</td>
+          <td class="score-mid">6.5 / 10</td>
+          <td class="score-low">4.5 / 10</td>
+          <td class="score-low">4.5 / 10</td>
+        </tr>
+        <tr>
+          <td>Architecture</td>
+          <td class="score-mid">7.5 / 10</td>
+          <td class="score-mid">7.5 / 10</td>
+          <td class="score-mid">6.0 / 10</td>
+        </tr>
+        <tr>
+          <td>Context Management</td>
+          <td class="score-high">9.0 / 10</td>
+          <td class="score-mid">8.0 / 10</td>
+          <td class="score-mid">7.0 / 10</td>
+        </tr>
+        <tr>
+          <td>Response Time</td>
+          <td>~30 seconds</td>
+          <td>~10-15 minutes</td>
+          <td class="score-high">~50 seconds</td>
+        </tr>
+        <tr>
+          <td>Cost per Review</td>
+          <td>Included ($200/mo)</td>
+          <td>Included ($200/mo)</td>
+          <td class="score-high">$0.02</td>
+        </tr>
+        <tr>
+          <td>Response Length</td>
+          <td>5,659 chars</td>
+          <td>7,455 chars</td>
+          <td class="score-high">~13,000 chars</td>
+        </tr>
+        <tr>
+          <td>Recommendation</td>
+          <td class="score-mid">Conditional GO</td>
+          <td class="score-low">NO-GO</td>
+          <td class="score-low">NO-GO</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<section>
+  <div class="container">
+    <h2>Key Findings by Model</h2>
+    <p>Each model uncovered different issues. Here's what was unique to each reviewer.</p>
+    
+    <div class="finding-cards">
+      <div class="finding critical">
+        <h4>🔴 "Trusted Host" Is Not Security</h4>
+        <p>Both Pro and Qwen flagged that "No sandbox needed — Builder runs on Mac (trusted host)" is dangerous. An agent with exec + unrestricted network = full system compromise if prompt-injected.</p>
+        <div class="source">Found by: ChatGPT Pro + Qwen3.5-Plus</div>
+      </div>
+      
+      <div class="finding critical">
+        <h4>🔴 Agent Self-Modification Risk</h4>
+        <p>Builder can modify its own SOUL.md, potentially altering its personality and bypassing safety instructions. Nothing enforces personality persistence across session resets.</p>
+        <div class="source">Found by: Qwen3.5-Plus only</div>
+      </div>
+      
+      <div class="finding critical">
+        <h4>🔴 Session Messaging as Exfiltration Channel</h4>
+        <p>sessions_send between Builder and Otto could be abused to exfiltrate data through Otto's Telegram channel — bypassing Builder's own restricted communication.</p>
+        <div class="source">Found by: Qwen3.5-Plus only</div>
+      </div>
+      
+      <div class="finding">
+        <h4>🟡 File-Based Handoff = Injection Vector</h4>
+        <p>PHASE.md and JOB.md are read as instructions. If an attacker can influence their content, they can override agent behavior. Needs schema validation and size limits.</p>
+        <div class="source">Found by: ChatGPT Pro + Qwen3.5-Plus</div>
+      </div>
+      
+      <div class="finding">
+        <h4>🟡 No Formal Job State Machine</h4>
+        <p>The plan describes a flow but lacks explicit states (PENDING, IN_PROGRESS, BLOCKED, FAILED) with transitions, retry logic, and recovery mechanisms.</p>
+        <div class="source">Found by: Qwen3.5-Plus only</div>
+      </div>
+      
+      <div class="finding success">
+        <h4>✅ Context Phase Design is Strong</h4>
+        <p>All three reviewers agreed the phased context approach (fresh session per build phase, file-based handoff via PHASE.md) is the right pattern. This scored highest across all models.</p>
+        <div class="source">Consensus across all three models</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section>
+  <div class="container">
+    <h2>What We Learned About LLM Reviews</h2>
+    
+    <div class="finding-cards">
+      <div class="finding success">
+        <h4>Qwen3.5-Plus: Best Value for Critical Reviews</h4>
+        <p>Matched ChatGPT Pro's harshness, found unique issues others missed, responded in 50 seconds for $0.02. The clear winner for iterative review cycles where speed matters.</p>
+      </div>
+      <div class="finding">
+        <h4>ChatGPT Auto: Too Generous for Security</h4>
+        <p>Scored Builder security 6.5/10 while Pro and Qwen both scored 4.5/10. Auto's findings were a subset of the other two — nothing unique. Fine for PRD generation, not for security audits.</p>
+      </div>
+      <div class="finding">
+        <h4>ChatGPT Pro: Deep but Slow</h4>
+        <p>Caught real issues Auto missed, but took 10-15 minutes per response. Best reserved for final deployment sign-off when stakes are highest and speed doesn't matter.</p>
+      </div>
+    </div>
+    
+    <div class="status-banner">
+      <h3>🔬 Ongoing Research</h3>
+      <p>We're continuing to run every review through all three models, logging results to our Pipeline Intelligence repository. Over time, we'll have the data to optimize exactly which model to use for which task — ensuring we never go backwards on a proven decision.</p>
+    </div>
+  </div>
+</section>
+
+<section>
+  <div class="container">
+    <h2>Security Roadmap</h2>
+    <p>Based on reviewer consensus, these fixes are required before the Builder agent goes to production.</p>
+    
+    <table class="bench-table">
+      <thead>
+        <tr><th>Priority</th><th>Fix</th><th>Status</th></tr>
+      </thead>
+      <tbody>
+        <tr><td class="score-low">P0</td><td>Real sandboxing (container, macOS sandbox-exec, or VM)</td><td>🔴 Required</td></tr>
+        <tr><td class="score-low">P0</td><td>Command allowlisting for exec (git, npm, swift, codex only)</td><td>🔴 Required</td></tr>
+        <tr><td class="score-low">P0</td><td>Network egress filtering (allowlist Telegram API + model APIs only)</td><td>🔴 Required</td></tr>
+        <tr><td class="score-mid">P1</td><td>Audit logging for all tool invocations</td><td>🟡 Planned</td></tr>
+        <tr><td class="score-mid">P1</td><td>Formal job state machine with recovery</td><td>🟡 Planned</td></tr>
+        <tr><td class="score-mid">P1</td><td>Schema validation for handoff files</td><td>🟡 Planned</td></tr>
+        <tr><td>P2</td><td>SOUL.md immutability enforcement</td><td>⚪ Backlog</td></tr>
+        <tr><td>P2</td><td>Rate limiting on sessions_send</td><td>⚪ Backlog</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<footer>
+  <div class="container">
+    <p style="margin-bottom: 8px;">Built by <strong style="color:#fff">Otto</strong> 🦦 — AI Automation System</p>
+    <p>Analysis date: February 17, 2026 · Powered by OpenClaw</p>
+    <p style="margin-top: 12px;"><a href="https://github.com/mikehelm">github.com/mikehelm</a></p>
+  </div>
+</footer>
+
+</body>
+</html>
